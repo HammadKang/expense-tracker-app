@@ -2,14 +2,19 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-type Props = { onDone: () => void };
+type Props = {
+  // Fires when the fade-out begins, so the app content can start appearing
+  // underneath instead of waiting for a blank frame.
+  onExitStart?: () => void;
+  onDone: () => void;
+};
 
 const LOGO = 140; // must match the native LaunchScreen image size
 
 // Frame 0 is identical to the native launch screen (flat blue + wallet), so the
 // hand-off is invisible. Then: gradient blooms in, a coin drops into the
 // wallet, the wallet squashes, a ripple fires, and the title rises in.
-const SplashScreen = ({ onDone }: Props) => {
+const SplashScreen = ({ onExitStart, onDone }: Props) => {
   const gradient = useRef(new Animated.Value(0)).current;
   const stageScale = useRef(new Animated.Value(1)).current;
   const stageLift = useRef(new Animated.Value(0)).current;
@@ -28,7 +33,7 @@ const SplashScreen = ({ onDone }: Props) => {
     const t = (v: Animated.Value, to: number, duration: number, easing = Easing.out(Easing.cubic), delay = 0) =>
       Animated.timing(v, { toValue: to, duration, easing, delay, useNativeDriver: true });
 
-    const anim = Animated.sequence([
+    const intro = Animated.sequence([
       // 1. bloom + grow, coin falls in
       Animated.parallel([
         t(gradient, 1, 520),
@@ -53,15 +58,21 @@ const SplashScreen = ({ onDone }: Props) => {
         Animated.sequence([Animated.delay(380), t(bar, 1, 420)]),
       ]),
       Animated.delay(520),
-      // 3. exit
-      Animated.parallel([
-        t(exit, 0, 360, Easing.in(Easing.quad)),
-        t(exitScale, 1.06, 360, Easing.in(Easing.quad)),
-      ]),
     ]);
-    anim.start(({ finished }) => finished && onDone());
-    return () => anim.stop();
-  }, [bar, coinOpacity, coinTilt, coinY, exit, exitScale, gradient, onDone, ring, squash, stageLift, stageScale, tagline, title]);
+    const outro = Animated.parallel([
+      t(exit, 0, 420, Easing.in(Easing.quad)),
+      t(exitScale, 1.06, 420, Easing.in(Easing.quad)),
+    ]);
+    intro.start(({ finished }) => {
+      if (!finished) return;
+      onExitStart?.();
+      outro.start(({ finished: done }) => done && onDone());
+    });
+    return () => {
+      intro.stop();
+      outro.stop();
+    };
+  }, [bar, coinOpacity, coinTilt, coinY, exit, exitScale, gradient, onDone, onExitStart, ring, squash, stageLift, stageScale, tagline, title]);
 
   const rise = (v: Animated.Value) => ({
     opacity: v,

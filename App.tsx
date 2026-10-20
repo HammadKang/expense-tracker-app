@@ -10,7 +10,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  UIManager,
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -45,13 +44,11 @@ import {
 const STORAGE_KEY = 'UserExpense';
 const CURRENCY_KEY = 'Currency';
 
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-const animateLayout = () =>
+// LayoutAnimation is iOS-only here: on Android it fights with the natively
+// driven Animated values and made the floating + button disappear after a few
+// currency/month switches. Rows already animate in on their own.
+const animateLayout = () => {
+  if (Platform.OS !== 'ios') return;
   LayoutAnimation.configureNext(
     LayoutAnimation.create(
       260,
@@ -59,6 +56,7 @@ const animateLayout = () =>
       LayoutAnimation.Properties.opacity,
     ),
   );
+};
 
 const loadExpenses = (): Expense[] => {
   try {
@@ -91,6 +89,7 @@ function App(): React.JSX.Element {
   const currentMonth = monthKey();
   const [viewMonth, setViewMonth] = useState<string>(currentMonth);
   const [toast, setToast] = useState('');
+  const [contentReady, setContentReady] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const headerIn = useRef(new Animated.Value(0)).current;
@@ -98,7 +97,7 @@ function App(): React.JSX.Element {
   const fabSpin = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!splashDone) return;
+    if (!contentReady) return;
     Animated.parallel([
       Animated.timing(headerIn, {
         toValue: 1,
@@ -116,7 +115,7 @@ function App(): React.JSX.Element {
         }),
       ]),
     ]).start();
-  }, [splashDone, headerIn, fabIn]);
+  }, [contentReady, headerIn, fabIn]);
 
   useEffect(() => {
     Animated.spring(fabSpin, {
@@ -275,7 +274,11 @@ function App(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#3585CC" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
       <Animated.View
         style={{
           zIndex: 20,
@@ -301,7 +304,8 @@ function App(): React.JSX.Element {
               style={[
                 styles.headerInner,
                 Platform.OS === 'android' && {
-                  paddingTop: StatusBar.currentHeight,
+                  // status bar height + breathing room under it
+                  paddingTop: (StatusBar.currentHeight ?? 0) + 20,
                 },
               ]}>
               <View style={styles.headerTop}>
@@ -358,7 +362,7 @@ function App(): React.JSX.Element {
         </View>
       </Animated.View>
 
-      {splashDone && (
+      {contentReady && (
         <SectionList
           key={`${currency}-${viewMonth}`}
           sections={sections}
@@ -426,7 +430,7 @@ function App(): React.JSX.Element {
       </Animated.View>
 
       <Animated.View
-        pointerEvents={splashDone ? 'auto' : 'none'}
+        pointerEvents={contentReady ? 'auto' : 'none'}
         style={[
           styles.fabWrap,
           {
@@ -480,7 +484,12 @@ function App(): React.JSX.Element {
         onClose={() => setIsAddExpense(false)}
         handleSave={onAdd}
       />
-      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+      {!splashDone && (
+        <SplashScreen
+          onExitStart={() => setContentReady(true)}
+          onDone={() => setSplashDone(true)}
+        />
+      )}
     </View>
   );
 }
@@ -502,7 +511,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
-  headerInner: {paddingHorizontal: 24, paddingTop: 12, paddingBottom: 24},
+  headerInner: {paddingHorizontal: 24, paddingTop: 18, paddingBottom: 26},
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
