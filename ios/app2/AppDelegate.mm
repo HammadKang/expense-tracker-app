@@ -14,6 +14,17 @@
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
 
+// Keep the root view the same blue as the launch screen so there is no white
+// flash between the native splash and the animated JS splash.
+- (UIView *)createRootViewWithBridge:(RCTBridge *)bridge
+                          moduleName:(NSString *)moduleName
+                           initProps:(NSDictionary *)initProps
+{
+  UIView *rootView = [super createRootViewWithBridge:bridge moduleName:moduleName initProps:initProps];
+  rootView.backgroundColor = [UIColor colorWithRed:0.2078 green:0.5216 blue:0.8 alpha:1.0];
+  return rootView;
+}
+
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
 {
 #if DEBUG

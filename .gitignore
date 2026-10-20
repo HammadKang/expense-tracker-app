@@ -64,3 +64,6 @@ yarn-error.log
 
 # testing
 /coverage
+
+# Yarn Berry cache/state (large, machine-specific)
+.yarn/
